@@ -1,0 +1,479 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Basic template that creates a new VPC, 3 subnets, and launches 2 vMX instances.  Each vMX instance has one management interface, each landing in subnet1 and subnet2, and one more interface which lands in a common subnet3",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Network Configuration"
+                    },
+                    "Parameters": [
+                        "VPCCIDR",
+                        "ManagementSubnetVMX1CIDR",
+                        "ManagementSubnetVMX2CIDR",
+                        "CommonSubnetCIDR"
+                      ]
+                },
+                {
+                    "Label": {
+                        "default": "Amazon EC2 Configuration"
+                    },
+                    "Parameters": [
+                        "KeyPairName"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "KeyPairName": {
+                    "default": "Key pair name"
+                },
+                "ManagementSubnetVMX1CIDR": {
+                    "default": "IP Range for the vMX1 Management network"
+                },
+                "ManagementSubnetVMX2CIDR": {
+                    "default": "IP Range for the vMX2 Management network"
+                },
+                "CommonSubnetCIDR": {
+                    "default": "IP Range for the common network between the 2 vMXs"
+                },
+                "VPCCIDR": {
+                    "default": "VPC CIDR"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "KeyPairName": {
+            "Description": "Public/private key pairs allow you to securely connect to your vMX instances after they launch.",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "ManagementSubnetVMX1CIDR": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Default": "10.0.1.0/24",
+            "Description": "CIDR block for Management subnet for vMX1",
+            "Type": "String"
+        },
+        "ManagementSubnetVMX2CIDR": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Default": "10.0.2.0/24",
+            "Description": "CIDR block for Management subnet for vMX2",
+            "Type": "String"
+        },
+        "CommonSubnetCIDR": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Default": "10.0.3.0/24",
+            "Description": "CIDR block for the common subnet between vMX1 and vMX2",
+            "Type": "String"
+        },
+        "VPCCIDR": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Default": "10.0.0.0/16",
+            "Description": "CIDR block for the VPC",
+            "Type": "String"
+        }
+    },
+    "Mappings": {
+        "AWSAMIRegionMap": {
+            "ap-south-1": {
+                "AWSVMX": "ami-15a4d17a"
+            },
+            "eu-west-1": {
+                "AWSVMX": "ami-d2cab9a1"
+            },
+            "ap-southeast-1": {
+                "AWSVMX": "ami-60b36803"
+            },
+            "ap-southeast-2": {
+                "AWSVMX": "ami-18e1d77b"
+            },
+            "ap-northeast-2": {
+                "AWSVMX": "ami-58e43136"
+            },
+            "eu-central-1": {
+                "AWSVMX": "ami-67a55608"
+            },
+            "ap-northeast-1": {
+                "AWSVMX": "ami-54dd1635"
+            },
+            "us-east-1": {
+                "AWSVMX": "ami-3f8fe628"
+            },
+            "us-east-2": {
+                "AWSVMX": "ami-788fd41d"
+            },
+            "us-west-1": {
+                "AWSVMX": "ami-c1d09da1"
+            },
+            "sa-east-1": {
+                "AWSVMX": "ami-d036a7bc"
+            },
+            "us-west-2": {
+                "AWSVMX": "ami-7d9b4a1d"
+            }
+        },
+        "AWSInfoRegionMap": {
+            "ap-northeast-1": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "ap-northeast-2": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "ap-south-1": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "ap-southeast-1": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "ap-southeast-2": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "eu-central-1": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "eu-west-1": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "sa-east-1": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "us-east-1": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "us-east-2": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "us-gov-west-1": {
+                "Partition": "aws-us-gov",
+                "QuickStartS3URL": "https://s3-us-gov-west-1.amazonaws.com"
+            },
+            "us-west-1": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            },
+            "us-west-2": {
+                "Partition": "aws",
+                "QuickStartS3URL": "https://s3.amazonaws.com"
+            }
+        }
+    },
+    "Resources": {
+        "DHCPOptions": {
+            "Type": "AWS::EC2::DHCPOptions",
+            "Properties": {
+                "DomainName": "us-west-1.compute.internal",
+                "DomainNameServers": [
+                "AmazonProvidedDNS"
+                ]
+            }
+        },
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "VPCCIDR"
+                },
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+        "VPCDHCPOptionsAssociation": {
+            "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "DhcpOptionsId": {
+                    "Ref": "DHCPOptions"
+                }
+            }
+        },
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+        "VPCGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "ManagementSubnetVMX1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "ManagementSubnetVMX1CIDR"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Management Subnet for VMX1"
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ],
+                "MapPublicIpOnLaunch": true
+            }
+        },
+        "ManagementSubnetVMX2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "ManagementSubnetVMX2CIDR"
+                },
+                 "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Management Subnet for VMX2"
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ],
+                "MapPublicIpOnLaunch": true
+            }
+        },
+        "CommonSubnet": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Ref": "CommonSubnetCIDR"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Common (private) subnet between the 2 vMXs"
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Private"
+                    }
+                ]
+            }
+        }, 
+        "CommonSubnetRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Common Subnet"
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Private"
+                    }
+                ]
+            }
+        },
+        "CommonSubnetRouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "CommonSubnet"
+                },
+                "RouteTableId": {
+                    "Ref": "CommonSubnetRouteTable"
+                }
+            }
+        },
+        "ManagementSubnetVMX1RouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Public Subnets"
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+        "ManagementSubnetVMX1Route": {
+             "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "ManagementSubnetVMX1RouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "ManagementSubnetVMX1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "ManagementSubnetVMX1"
+                },
+                "RouteTableId": {
+                    "Ref": "ManagementSubnetVMX1RouteTable"
+                }
+            }
+        },
+        "ManagementSubnetVMX2RouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Public Subnets"
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+        "ManagementSubnetVMX2Route": {
+             "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "ManagementSubnetVMX2RouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "ManagementSubnetVMX2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "ManagementSubnetVMX2"
+                },
+                "RouteTableId": {
+                    "Ref": "ManagementSubnetVMX2RouteTable"
+                }
+            }
+        },
+        "InstanceSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Allow inbound SSH and outbound HTTP",
+                "VpcId" : {"Ref" : "VPC"},
+                "SecurityGroupIngress" : [{
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "22",
+                    "ToPort" : "22",
+                    "CidrIp" : "0.0.0.0/0"
+                }],
+                "SecurityGroupEgress" : [{
+                    "IpProtocol" : "tcp",
+                    "FromPort" : "80",
+                    "ToPort" : "80",
+                    "CidrIp" : "0.0.0.0/0"
+                }]
+            }
+        },  
+        "VMX1Instance" : {
+          "Type" : "AWS::EC2::Instance",
+          "Properties" : {
+            "ImageId" : { "Fn::FindInMap" : [ "AWSAMIRegionMap", { "Ref" : "AWS::Region" }, "AWSVMX" ]},
+            "KeyName" : { "Ref" : "KeyPairName" },
+            "DisableApiTermination": "false",
+            "InstanceInitiatedShutdownBehavior": "stop",
+            "EbsOptimized": "true",
+            "InstanceType": "m4.xlarge",
+            "Monitoring": "false",
+            "Tags": [{
+                "Key": "Name",
+                "Value": "vMX1"
+            }],
+            "NetworkInterfaces": [ {
+                "AssociatePublicIpAddress": "true",
+                "DeviceIndex": "0",
+                "GroupSet": [{ "Ref" : "InstanceSecurityGroup" }],
+                "SubnetId": { "Ref" : "ManagementSubnetVMX1" }
+            } ]
+          }
+        }
+    },
+    "Outputs": {
+        "ManagementSubnetVMX1CIDR": {
+            "Description": "vMX1 - Management subnet address block",
+            "Value": {
+                "Ref": "ManagementSubnetVMX1CIDR"
+            }
+        },
+        "ManagementSubnetVMX2CIDR": {
+            "Description": "vMX2 - Management subnet address block",
+            "Value": {
+                "Ref": "ManagementSubnetVMX2CIDR"
+            }
+        },
+        "CommonSubnetCIDR": {
+            "Description": "Common subnet address block",
+            "Value": {
+                "Ref": "CommonSubnetCIDR"
+            }
+        },
+        "VMX1PublicManagementIF": {
+            "Description": "vMX1 Management Public IP address",
+            "Value": {
+                "Fn::GetAtt" : [ "VMX1Instance" , "PublicIp" ]
+            }
+        }
+    }
+}
